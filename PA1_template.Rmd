@@ -4,22 +4,139 @@ output:
   html_document:
     keep_md: true
 ---
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+##
+Dataset: Activity monitoring data [52K]
+steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)
+date: The date on which the measurement was taken in YYYY-MM-DD format
+interval: Identifier for the 5-minute interval in which measurement was taken
+The dataset is stored in a CSV file and total observation is 17,568. 
+
 
 
 ## Loading and preprocessing the data
-
-
+```{r, echo=FALSE}
+if(!file.exists("./data")){dir.create("./data")}
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+download.file(fileUrl, destfile = "./data/activity.zip", method ="curl")
+unzip("./data/activity.zip")
+```
+```{r}
+library(ggplot2)
+library(data.table)
+library(lattice)
+```
 
 ## What is mean total number of steps taken per day?
-
+#read data file and store in "DT"
+```{r}
+DT<-read.csv("activity.csv")
+str(DT)
+head(DT)
+```
+#set language in English for "weekdays"
+```{r}
+Sys.setlocale("LC_TIME","en_GB")
+```
+#data table with weekdays = "DTW"
+# add weekday_colomun to dataset "DTW"
+```{r}
+DTW <- transform(DT,weekday=weekdays(as.Date(DT$date)))
+DTW$weekday <- ifelse(DTW$weekday == "Sunday", "weekend", ifelse(DTW$weekday == "Saturday", "weekend", "weekday"))
+```
+# data table without NA = "DT_comp"
+# na.omit from "DTW" and store in "DT_comp"
+```{r}
+DT_comp <- DTW[complete.cases(DTW),]
+head(DT_comp)
+```
+# 1. Make histogram of the total number of steps/day
+# make the table for histogram of total steps per day = "ttl_st"
+```{r}
+ttl_st <-aggregate(steps ~ date, DT_comp,sum)
+names(ttl_st)[2] <- "total_steps"
+head(ttl_st)
+```
+# make histgram=(1)
+```{r}
+ggplot(ttl_st, aes(x = total_steps)) + geom_histogram(binwidth = 1000, colour = "black", fill="blue") + labs(title = "Total Steps Taken per Day", x = "Number of Steps",y="frequency")
+```
+#Calculate and report the mean and median (2)
+```{r}
+mean(ttl_st$total_steps)
+median(ttl_st$total_steps)
+```
+# Save copy of plot to PNG file
+```{r}
+dev.copy(png,file="ttl_stp_day.png")  
+dev.off()   ##close the PNG device
+```
 
 
 ## What is the average daily activity pattern?
+# make table for average steps, and sotre in "avg_p"
+```{r}
+avg_p <-aggregate(steps ~ interval, DT_comp,mean)
+```
+# name for newcolomn "avg_steps"
+```{r}
+names(avg_p)[2] <- "avg_steps"
+head(avg_p)
+```
+# make type "l" plot of average daily activity pattern
+## plot time series
+```{r}
 
+plot(
+  x = avg_p$interval,
+  y = avg_p$avg_steps,
+  type = "l", layout = c(1,1),
+  main = "Average of Steps taken/Day",
+  xlab = "5-Minute Interval",
+  ylab = "Average Number of Steps Taken"
+)
+```
 
 
 ## Imputing missing values
 
+## Compare with raw data (including NA) and cealned data
+# total number of missing values => check summary(DT)
+# dataset"DT" include missing value
+# dataset"DT_comp" exclude missing value
+```{r}
+dim(DT)[1]-dim(DT_comp)[1]  ## missing value = 2304
+```
+DT_NA <- DT[is.na(DT$steps),] # (1)table of only "NA" value
+DT_NA = merge(avg_p,DT_NA)  # (2) input average value to "NA"
+
+DT_NA<- DT_NA[,c(2,4,1,5)] # arrange colomun order
+names(DT_NA)<-c("steps","date","interval","weekday") #rename same as "DT_comp"
+DT_NA$weekday <- ifelse(DT_NA$weekday == "Sunday", "weekend", ifelse(DT_NA == "Saturday", "weekend", "weekday"))
+DT_NA <-rbind(DT_NA,DT_comp) # merge "DT_comp" & "DT_NA" 
+summary(DT_NA) # chech the new table which include missing valu
+tail(DT_NA,30)
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+# Caliculat mean of steps/day, and day type in variable "DTWWE"
+```{r}
+DTWWE <- aggregate(steps ~ interval + weekday, DT_comp, mean)
+```
+# make plot of weekdays and weekdays
+```{r}
+xyplot(
+  steps ~ interval | weekday,
+  DTWWE,
+  type = "l",
+  layout = c(1,2),
+  main = "Average number of steps Weekday days vs Weekend days",
+  xlab = "5-Minute Interval",
+  ylab = "Average Number of Steps Taken"
+)
+
+dev.copy(png,file="Time series.png")  #Copy my plot to PNG file
+dev.off()   ##close the PNG device
+```
+
